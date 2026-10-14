@@ -71,6 +71,104 @@
         }
             :root { color-scheme: dark; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
         html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+        /* ── Enhanced hover & transition styles ── */
+
+        /* Leaderboard table rows */
+        #leaderboardBody tr {
+            transition: background-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        #leaderboardBody tr:hover {
+            background-color: rgba(250, 204, 21, 0.07) !important;
+            box-shadow: inset 3px 0 0 0 rgba(250, 204, 21, 0.5);
+        }
+
+        /* Match history cards */
+        #matchHistoryList > div {
+            transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+        }
+        #matchHistoryList > div:hover {
+            background-color: rgba(15, 23, 42, 1) !important;
+            border-color: rgba(100, 116, 139, 0.6) !important;
+            transform: translateX(3px);
+            box-shadow: -3px 0 0 0 rgba(234, 88, 12, 0.5);
+        }
+
+        /* Clickable player name button in leaderboard */
+        .player-name-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            color: inherit;
+            font: inherit;
+            font-weight: 800;
+            font-size: 1rem;
+            text-align: left;
+            transition: color 0.15s ease, text-shadow 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .player-name-btn:hover {
+            color: #fde68a;
+            text-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+        }
+        .player-name-btn::after {
+            content: '↗';
+            font-size: 0.65em;
+            opacity: 0;
+            transform: translateY(2px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            color: #f59e0b;
+        }
+        .player-name-btn:hover::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Card sections hover glow */
+        main section > div {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        main section > div:hover {
+            border-color: rgba(100, 116, 139, 0.5);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(100, 116, 139, 0.1);
+        }
+
+        /* ── H2H Modal ── */
+        #h2hModal {
+            animation: h2hFadeIn 0.18s ease;
+        }
+        #h2hModal .modal-card {
+            animation: h2hSlideUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes h2hFadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        @keyframes h2hSlideUp {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* H2H progress bar fill animation */
+        .h2h-bar-fill {
+            transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Delete button in match history */
+        #matchHistoryList button {
+            transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+        }
+        #matchHistoryList button:hover {
+            transform: scale(1.15);
+        }
+
+        /* Header nav buttons active press */
+        header button:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between pb-10">
@@ -317,6 +415,64 @@
                 <button id="resetConfirmBtn" type="button" onclick="confirmReset()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-lg shadow-red-600/30 transition">
                     確定重置
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- H2H 玩家詳細統計 Modal -->
+    <div id="h2hModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4" onclick="closeH2HModal(event)">
+        <div class="modal-card bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="sf6-header-bg border-b-2 border-yellow-500 px-6 py-4 flex items-center justify-between relative z-10">
+                <div>
+                    <div class="text-[11px] font-bold text-yellow-400 uppercase tracking-widest mb-0.5">Player Stats</div>
+                    <h3 id="h2hPlayerName" class="text-2xl font-black text-white tracking-wide"></h3>
+                </div>
+                <button onclick="closeH2HModal()" class="w-8 h-8 rounded-lg bg-black/30 hover:bg-black/60 text-slate-300 hover:text-white flex items-center justify-center transition text-lg font-bold">✕</button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 max-h-[70vh] overflow-y-auto space-y-6">
+
+                <!-- Overall record -->
+                <div>
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">綜合戰績 Overall Record</div>
+                    <div class="grid grid-cols-3 gap-3 text-center mb-4">
+                        <div class="bg-slate-950 rounded-xl p-3 border border-slate-800">
+                            <div id="h2hWins" class="text-3xl font-black text-emerald-400 font-fighter"></div>
+                            <div class="text-[11px] text-slate-500 font-semibold mt-0.5">WINS</div>
+                        </div>
+                        <div class="bg-slate-950 rounded-xl p-3 border border-slate-800">
+                            <div id="h2hLosses" class="text-3xl font-black text-red-400 font-fighter"></div>
+                            <div class="text-[11px] text-slate-500 font-semibold mt-0.5">LOSSES</div>
+                        </div>
+                        <div class="bg-slate-950 rounded-xl p-3 border border-slate-800">
+                            <div id="h2hTotal" class="text-3xl font-black text-slate-200 font-fighter"></div>
+                            <div class="text-[11px] text-slate-500 font-semibold mt-0.5">TOTAL</div>
+                        </div>
+                    </div>
+                    <!-- Win rate bar -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold text-emerald-400 w-10 text-right" id="h2hWinPct">0%</span>
+                        <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div id="h2hWinBar" class="h2h-bar-fill h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full" style="width:0%"></div>
+                        </div>
+                        <span class="text-[11px] font-bold text-red-400 w-10" id="h2hLossPct">0%</span>
+                    </div>
+                </div>
+
+                <!-- H2H by opponent -->
+                <div>
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">對戰對手 Head-to-Head</div>
+                    <div id="h2hOpponentList" class="space-y-2"></div>
+                </div>
+
+                <!-- Top characters -->
+                <div>
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">常用角色 Top Characters</div>
+                    <div id="h2hCharList" class="space-y-2"></div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -768,7 +924,9 @@
                     <tr class="${rowBgClass} transition">
                         <td class="py-3.5 px-3 font-bold">${rankDisplay}</td>
                         <td class="py-3.5 px-3 font-extrabold text-white text-base">
-                            ${escapeHTML(p.name)}
+                            <button class="player-name-btn" onclick="openH2HModal(${JSON.stringify(escapeHTML(p.name))})" title="點擊查看詳細對戰數據">
+                                ${escapeHTML(p.name)}
+                            </button>
                         </td>
                         <td class="py-3.5 px-2 text-center font-bold text-emerald-400">${p.wins}</td>
                         <td class="py-3.5 px-2 text-center font-semibold text-red-400">${p.losses}</td>
@@ -1126,6 +1284,133 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
         }
+
+        // ==========================================
+        // 8. H2H 玩家詳細統計 Modal
+        // ==========================================
+        function openH2HModal(playerName) {
+            // Use ALL matches (not filtered by view) for comprehensive stats
+            const playerMatches = matches.filter(m => m.p1 === playerName || m.p2 === playerName);
+
+            // Overall stats
+            let wins = 0, losses = 0;
+            const opponents = {}; // opponentName -> { wins, losses }
+            const chars = {};    // charName -> count
+
+            playerMatches.forEach(m => {
+                const isP1 = m.p1 === playerName;
+                const opponent = isP1 ? m.p2 : m.p1;
+                const charUsed = isP1 ? m.p1Char : m.p2Char;
+                const won = (isP1 && m.winner === 'p1') || (!isP1 && m.winner === 'p2');
+
+                if (won) wins++; else losses++;
+
+                if (!opponents[opponent]) opponents[opponent] = { wins: 0, losses: 0 };
+                if (won) opponents[opponent].wins++; else opponents[opponent].losses++;
+
+                chars[charUsed] = (chars[charUsed] || 0) + 1;
+            });
+
+            const total = wins + losses;
+            const winPct = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
+            const lossPct = total > 0 ? ((losses / total) * 100).toFixed(1) : '0.0';
+
+            // Populate header & overall
+            document.getElementById('h2hPlayerName').textContent = playerName;
+            document.getElementById('h2hWins').textContent = wins;
+            document.getElementById('h2hLosses').textContent = losses;
+            document.getElementById('h2hTotal').textContent = total;
+            document.getElementById('h2hWinPct').textContent = winPct + '%';
+            document.getElementById('h2hLossPct').textContent = lossPct + '%';
+
+            // Show modal first so bar animation is visible
+            const modal = document.getElementById('h2hModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Animate win rate bar after a brief paint delay
+            const bar = document.getElementById('h2hWinBar');
+            bar.style.width = '0%';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                bar.style.width = (total > 0 ? (wins / total) * 100 : 0) + '%';
+            }));
+
+            // Opponents H2H list (sorted by total matches desc)
+            const sortedOpponents = Object.entries(opponents).sort((a, b) =>
+                (b[1].wins + b[1].losses) - (a[1].wins + a[1].losses)
+            );
+            const opponentContainer = document.getElementById('h2hOpponentList');
+            if (sortedOpponents.length === 0) {
+                opponentContainer.innerHTML = '<div class="text-xs text-slate-500 italic">尚無對戰紀錄</div>';
+            } else {
+                opponentContainer.innerHTML = sortedOpponents.map(([opp, rec]) => {
+                    const t = rec.wins + rec.losses;
+                    const wPct = t > 0 ? (rec.wins / t) * 100 : 0;
+                    const outcome = rec.wins > rec.losses ? 'text-emerald-400' : rec.wins < rec.losses ? 'text-red-400' : 'text-slate-400';
+                    return `
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-bold text-white">${escapeHTML(opp)}</span>
+                                <span class="text-xs font-extrabold ${outcome}">${rec.wins}W – ${rec.losses}L</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                    <div class="h2h-bar-fill h-full rounded-full ${wPct >= 50 ? 'bg-emerald-500' : 'bg-red-500'}" style="width:0%" data-target="${wPct.toFixed(1)}"></div>
+                                </div>
+                                <span class="text-[11px] text-slate-500 font-mono w-12 text-right">${t} 場</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                // Animate opponent bars
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    opponentContainer.querySelectorAll('.h2h-bar-fill[data-target]').forEach(el => {
+                        el.style.width = el.dataset.target + '%';
+                    });
+                }));
+            }
+
+            // Top characters list
+            const sortedChars = Object.entries(chars).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const maxCharCount = sortedChars[0]?.[1] || 1;
+            const charContainer = document.getElementById('h2hCharList');
+            charContainer.innerHTML = sortedChars.map(([char, count]) => {
+                const pct = ((count / total) * 100).toFixed(0);
+                const barPct = ((count / maxCharCount) * 100).toFixed(1);
+                return `
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-slate-300 font-semibold w-40 truncate shrink-0">${escapeHTML(char)}</span>
+                        <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h2h-bar-fill h-full bg-yellow-500 rounded-full" style="width:0%" data-target="${barPct}"></div>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-mono w-16 text-right shrink-0">${count}場 (${pct}%)</span>
+                    </div>
+                `;
+            }).join('');
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                charContainer.querySelectorAll('.h2h-bar-fill[data-target]').forEach(el => {
+                    el.style.width = el.dataset.target + '%';
+                });
+            }));
+        }
+
+        function closeH2HModal(event) {
+            if (event && event.target !== document.getElementById('h2hModal')) return;
+            const modal = document.getElementById('h2hModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Escape key closes H2H modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('h2hModal');
+                if (!modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            }
+        });
     </script>
 </body>
 </html>
