@@ -97,8 +97,11 @@
                 <button onclick="loadDemoData()" id="demoBtn" class="bg-slate-900/70 hover:bg-slate-900 text-yellow-300 text-xs font-semibold px-3 py-2 rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 shadow">
                     <span class="" aria-hidden="true">⚡</span> 載入範例戰績
                 </button>
-                <button onclick="openResetModal()" class="bg-red-950/80 hover:bg-red-900 text-red-200 text-xs font-semibold px-3 py-2 rounded-lg border border-red-500/50 transition flex items-center gap-1.5 shadow">
-                    <span class="" aria-hidden="true">🗑️</span> 重置所有資料
+                <button onclick="openResetModal('today')" class="bg-orange-950/80 hover:bg-orange-900 text-orange-200 text-xs font-semibold px-3 py-2 rounded-lg border border-orange-500/50 transition flex items-center gap-1.5 shadow">
+                    <span class="" aria-hidden="true">🧹</span> 重置今日資料
+                </button>
+                <button onclick="openResetModal('all')" class="bg-red-950/80 hover:bg-red-900 text-red-200 text-xs font-semibold px-3 py-2 rounded-lg border border-red-500/50 transition flex items-center gap-1.5 shadow">
+                    <span class="" aria-hidden="true">🔒</span> 重置所有資料
                 </button>
             </div>
         </div>
@@ -224,6 +227,15 @@
         <!-- 右側欄：排行榜與歷史紀錄 (佔 8 欄) -->
         <section class="lg:col-span-8 space-y-8">
             
+            <!-- 0. 日期檢視列：每天自動換新的一天，舊紀錄永久保留 -->
+            <div class="flex flex-wrap items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-4 py-3 shadow-2xl">
+                <span class="text-xs font-bold text-slate-400">📅 檢視</span>
+                <button id="viewTodayBtn" type="button" onclick="setViewToday()" class="text-xs font-bold px-3 py-1.5 rounded-lg border transition">今天</button>
+                <input id="dayPicker" type="date" onchange="setViewDate(this.value)" class="text-xs bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500">
+                <button id="viewAllBtn" type="button" onclick="setViewAll()" class="text-xs font-bold px-3 py-1.5 rounded-lg border transition">全部累計</button>
+                <span id="viewLabel" class="text-xs text-slate-400 w-full sm:w-auto sm:ml-auto"></span>
+            </div>
+
             <!-- 1. 玩家排行榜區 -->
             <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
                 <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 pb-3 mb-4">
@@ -288,17 +300,22 @@
                 <div class="w-10 h-10 rounded-full bg-red-950 border border-red-500/40 flex items-center justify-center text-lg">
                     <span class="" aria-hidden="true">⚠️</span>
                 </div>
-                <h3 class="text-lg font-bold text-white">確定要重置所有對戰資料嗎？</h3>
+                <h3 id="resetTitle" class="text-lg font-bold text-white"></h3>
             </div>
-            <p class="text-sm text-slate-300 mb-6 leading-relaxed">
-                這將會清空目前所有的<span class="text-yellow-400 font-semibold">玩家排行榜</span>與<span class="text-yellow-400 font-semibold">歷史對戰紀錄</span>，若為線上模式，所有朋友看到的紀錄也會一併清空，此操作無法復原。
-            </p>
+            <p id="resetDesc" class="text-sm text-slate-300 mb-4 leading-relaxed"></p>
+            <div id="resetPwdWrap" class="mb-5 hidden">
+                <label for="resetPwd" class="block text-xs font-bold text-slate-400 mb-1.5">請輸入重置密碼</label>
+                <input id="resetPwd" type="password" autocomplete="off" placeholder="密碼"
+                    class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 transition"
+                    onkeydown="if (event.key === 'Enter') confirmReset()">
+                <p id="resetPwdError" class="hidden text-xs text-red-400 font-bold mt-1.5"></p>
+            </div>
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition">
                     取消
                 </button>
-                <button type="button" onclick="confirmResetAllData()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-lg shadow-red-600/30 transition">
-                    確定清空重置
+                <button id="resetConfirmBtn" type="button" onclick="confirmReset()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-lg shadow-red-600/30 transition">
+                    確定重置
                 </button>
             </div>
         </div>
@@ -414,8 +431,15 @@
             apiKey: "AIzaSyBfm_rEGteaA_2SCbDLJ7LPrUMNc5s2Jtg",
             authDomain: "streetfight6tierlist.firebaseapp.com",
             projectId: "streetfight6tierlist",
-            appId: "1:645010242118:web:c9c47e75a7a50d99ae2847"
+            appId: "1:645010242118:web:c9c47e75a7a50d99ae2847"                                                                              
         };
+        // ==========================================
+        // 「重置所有資料」的密碼：請改成你自己的密碼。
+        // 留空 ('') 的話，「重置所有資料」會被鎖住，任何人都無法使用。
+        // 注意：這個檔案是公開的，密碼只是防朋友誤按的小鎖，不是真正的安全機制 (見說明)
+        // ==========================================
+        const RESET_PASSWORD = '';
+
         const FB_VERSION = '10.12.2';
         let fs = null; // firestore 模組
 
@@ -533,7 +557,67 @@
             return true;
         }
 
+        // ==========================================
+        // 每日紀錄：每筆戰績依登錄日期歸檔，預設只看「今天」，過了午夜自動換新的一天。
+        // 舊的日子不會被刪除，可用日期選擇器回頭看，或切換「全部累計」。
+        // ==========================================
+        let viewMode = 'today'; // 'today' | 'date' | 'all'
+        let viewDate = '';
+        let lastDayKey = '';
+
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        function dayKey(ts) {
+            const d = new Date(ts);
+            return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+        }
+        function todayKey() { return dayKey(Date.now()); }
+        function currentViewKey() {
+            if (viewMode === 'today') return todayKey();
+            if (viewMode === 'date') return viewDate;
+            return null;
+        }
+        function inView(m) {
+            const k = currentViewKey();
+            return k === null || dayKey(m.id) === k;
+        }
+        function visibleMatches() { return matches.filter(inView); }
+
+        function setViewToday() { viewMode = 'today'; renderAll(); }
+        function setViewAll() { viewMode = 'all'; renderAll(); }
+        function setViewDate(v) {
+            if (!v) return;
+            viewDate = v;
+            viewMode = (v === todayKey()) ? 'today' : 'date';
+            renderAll();
+        }
+
+        function renderDayBar() {
+            const on = 'bg-yellow-500 text-slate-950 border-yellow-400';
+            const off = 'bg-slate-950 text-slate-300 border-slate-700 hover:border-slate-500';
+            const base = 'text-xs font-bold px-3 py-1.5 rounded-lg border transition ';
+            document.getElementById('viewTodayBtn').className = base + (viewMode === 'today' ? on : off);
+            document.getElementById('viewAllBtn').className = base + (viewMode === 'all' ? on : off);
+            const picker = document.getElementById('dayPicker');
+            const key = currentViewKey();
+            picker.value = key || '';
+            picker.max = todayKey();
+            let label;
+            if (viewMode === 'all') label = '目前顯示：所有日期累計';
+            else if (viewMode === 'today') label = '目前顯示：今天 (' + key + ') 的排行榜';
+            else label = '目前顯示：' + key + ' 的排行榜（歷史紀錄）';
+            document.getElementById('viewLabel').textContent = label;
+        }
+
+        // 每分鐘檢查一次是否跨日，跨日時「今天」的排行榜自動刷新為新的一天
+        setInterval(function () {
+            const k = todayKey();
+            if (lastDayKey && k !== lastDayKey && viewMode === 'today') renderAll();
+            lastDayKey = k;
+        }, 60000);
+
         function renderAll() {
+            lastDayKey = todayKey();
+            renderDayBar();
             renderLeaderboard();
             renderHistory();
             updatePlayerDatalist();
@@ -586,7 +670,7 @@
             const stats = {};
 
             // 依時間順序（由舊到新）走訪每一場比賽，計算勝敗、連勝與角色使用次數
-            matches.forEach(m => {
+            visibleMatches().forEach(m => {
                 [m.p1, m.p2].forEach(player => {
                     if (!stats[player]) {
                         stats[player] = {
@@ -713,21 +797,21 @@
         // ==========================================
         function renderHistory() {
             const container = document.getElementById('matchHistoryList');
-            document.getElementById('matchCountBadge').textContent = `共 ${matches.length} 場對戰`;
+            const items = matches.map((m, i) => ({ m, i })).filter(x => inView(x.m));
+            document.getElementById('matchCountBadge').textContent = `共 ${items.length} 場對戰`;
 
-            if (matches.length === 0) {
+            if (items.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
-                        目前還沒有任何對戰歷史紀錄
+                        ${viewMode === 'all' ? '目前還沒有任何對戰歷史紀錄' : '這一天還沒有對戰紀錄'}
                     </div>
                 `;
                 return;
             }
 
             // 由新到舊排列
-            container.innerHTML = [...matches].reverse().map((m, revIdx) => {
-                const originalIndex = matches.length - 1 - revIdx;
-                const matchNumber = originalIndex + 1;
+            container.innerHTML = items.slice().reverse().map(({ m, i: originalIndex }, revIdx) => {
+                const matchNumber = items.length - revIdx;
                 const p1Win = m.winner === 'p1';
 
                 return `
@@ -834,6 +918,7 @@
                 time: timeStr
             });
             if (!ok) return;
+            if (viewMode === 'date') { viewMode = 'today'; renderAll(); }
 
             // 連戰友善設計：保留玩家名稱與角色，僅清除勝敗勾選
             document.querySelectorAll('input[name="winner"]').forEach(r => r.checked = false);
@@ -900,36 +985,105 @@
         // ==========================================
         // 7. 重置所有資料 Modal 與範例戰績載入
         // ==========================================
-        function openResetModal() {
+        let resetMode = 'all'; // 'all' | 'today'
+
+        function todayMatches() {
+            const k = todayKey();
+            return matches.filter(m => dayKey(m.id) === k);
+        }
+
+        function openResetModal(mode) {
+            resetMode = (mode === 'today') ? 'today' : 'all';
+            const title = document.getElementById('resetTitle');
+            const desc = document.getElementById('resetDesc');
+            const pwdWrap = document.getElementById('resetPwdWrap');
+            const pwd = document.getElementById('resetPwd');
+            const err = document.getElementById('resetPwdError');
+            const btn = document.getElementById('resetConfirmBtn');
+            err.classList.add('hidden');
+            pwd.value = '';
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            if (resetMode === 'today') {
+                const n = todayMatches().length;
+                title.textContent = '確定要重置今天的資料嗎？';
+                desc.innerHTML = `這將會刪除<span class="text-yellow-400 font-semibold">今天 (${todayKey()})</span>登錄的 <span class="text-yellow-400 font-semibold">${n} 場</span>對戰紀錄，其他日期的紀錄不受影響。若為線上模式，所有朋友看到的今日紀錄也會一併清空，此操作無法復原。`;
+                pwdWrap.classList.add('hidden');
+            } else {
+                title.textContent = '確定要重置所有對戰資料嗎？';
+                desc.innerHTML = `這將會清空<span class="text-yellow-400 font-semibold">所有日期</span>的<span class="text-yellow-400 font-semibold">玩家排行榜</span>與<span class="text-yellow-400 font-semibold">歷史對戰紀錄</span>，若為線上模式，所有朋友看到的紀錄也會一併清空，此操作無法復原。`;
+                pwdWrap.classList.remove('hidden');
+                if (!RESET_PASSWORD) {
+                    err.textContent = '尚未設定重置密碼，此功能目前鎖定。請站長在 index.html 的 RESET_PASSWORD 設定密碼。';
+                    err.classList.remove('hidden');
+                    pwd.disabled = true;
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    pwd.disabled = false;
+                }
+            }
+
             const modal = document.getElementById('confirmModal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+            if (resetMode === 'all' && RESET_PASSWORD) setTimeout(() => pwd.focus(), 50);
         }
 
         function closeResetModal() {
             const modal = document.getElementById('confirmModal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            document.getElementById('resetPwd').value = '';
         }
 
-        async function confirmResetAllData() {
-            closeResetModal();
+        async function deleteMatchList(list) {
             if (!db) {
-                matches = [];
+                const ids = new Set(list.map(m => m.id));
+                matches = matches.filter(m => !ids.has(m.id));
                 saveLocal();
                 renderAll();
-            } else {
-                if (!canWrite) { showFeedback('你目前是唯讀身分，無法重置資料。', 'error'); return; }
-                try {
-                    for (const m of [...matches]) {
-                        await fbDelete(m._docId);
-                    }
-                } catch (err) {
-                    handleWriteError(err);
+                return true;
+            }
+            if (!canWrite) { showFeedback('你目前是唯讀身分，無法重置資料。', 'error'); return false; }
+            try {
+                for (const m of list) {
+                    await fbDelete(m._docId);
+                }
+                return true;
+            } catch (err) {
+                handleWriteError(err);
+                return false;
+            }
+        }
+
+        async function confirmReset() {
+            if (resetMode === 'all') {
+                if (!RESET_PASSWORD) return;
+                const input = document.getElementById('resetPwd').value;
+                if (input !== RESET_PASSWORD) {
+                    const err = document.getElementById('resetPwdError');
+                    err.textContent = '密碼錯誤，請再試一次。';
+                    err.classList.remove('hidden');
                     return;
                 }
+                const list = [...matches];
+                closeResetModal();
+                if (await deleteMatchList(list)) {
+                    showFeedback('所有排行榜與對戰歷史紀錄已重置清空！', 'success');
+                }
+            } else {
+                const list = todayMatches();
+                closeResetModal();
+                if (list.length === 0) {
+                    showFeedback('今天還沒有任何對戰紀錄，不需要重置。', 'success');
+                    return;
+                }
+                if (await deleteMatchList(list)) {
+                    showFeedback(`已重置今天的 ${list.length} 場對戰紀錄！`, 'success');
+                }
             }
-            showFeedback('所有排行榜與對戰歷史紀錄已重置清空！', 'success');
         }
 
         // 載入範例資料方便預覽效果
@@ -948,6 +1102,8 @@
                 showFeedback('排行榜已有資料，請先重置後再載入範例戰績。', 'error');
                 return;
             }
+            const now = Date.now();
+            sampleMatches.forEach((m, i) => { m.id = now - (sampleMatches.length - i) * 60000; });
             if (!(await addMatches(sampleMatches))) return;
 
             // 預填最後一場的玩家方便直接體驗連戰
