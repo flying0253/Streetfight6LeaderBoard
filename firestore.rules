@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{room}/matches/{matchId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(
+            ['id','p1','p2','p1Char','p2Char','winner','time'])
+          && request.resource.data.p1 is string && request.resource.data.p1.size() <= 40
+          && request.resource.data.p2 is string && request.resource.data.p2.size() <= 40
+          && request.resource.data.winner in ['p1','p2'];
+      allow delete: if true;
+    }
+  }
+}

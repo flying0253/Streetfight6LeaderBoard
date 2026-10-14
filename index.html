@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>快打旋風 6 - 好友對戰排行榜與紀錄系統</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <!-- 引入 Google Fonts: Inter 與 Teko (用於格鬥標題數字) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Teko:ital,wght@0,600;0,700;1,700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #090d16;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(234, 88, 12, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.12) 0%, transparent 40%);
+            color: #f8fafc;
+        }
+        .font-fighter {
+            font-family: 'Teko', sans-serif;
+        }
+        .sf6-header-bg {
+            background: linear-gradient(135deg, #9a3412 0%, #dc2626 45%, #7f1d1d 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .sf6-header-bg::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(0, 0, 0, 0.1),
+                rgba(0, 0, 0, 0.1) 10px,
+                transparent 10px,
+                transparent 20px
+            );
+            pointer-events: none;
+        }
+        .vs-text {
+            background: linear-gradient(180deg, #fef08a 0%, #f97316 50%, #dc2626 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 2px 8px rgba(239, 68, 68, 0.5));
+        }
+        .btn-ko {
+            background: linear-gradient(90deg, #ea580c 0%, #dc2626 50%, #ea580c 100%);
+            background-size: 200% auto;
+            transition: 0.3s;
+        }
+        .btn-ko:hover {
+            background-position: right center;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+        }
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+            :root { color-scheme: dark; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+        html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-10">
+
+    <!-- 頂部導覽列 -->
+    <header class="sf6-header-bg border-b-4 border-yellow-500 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap justify-between items-center gap-4 relative z-10">
+            <div class="flex items-center space-x-3">
+                <div class="bg-yellow-500 text-slate-950 font-fighter text-4xl font-bold px-3 py-0.5 rounded-lg transform -skew-x-12 shadow-lg">
+                    SF6
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-black tracking-wider uppercase italic text-white drop-shadow">
+                        Street Fighter 6
+                    </h1>
+                    <p class="text-yellow-300 text-xs sm:text-sm font-bold tracking-wide">
+                        好友對戰排行榜 & 戰績紀錄系統
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <span id="syncBadge" class="text-xs font-bold px-3 py-2 rounded-lg border border-slate-600 bg-slate-900/70 text-slate-300">連線中…</span>
+                <button onclick="loadDemoData()" id="demoBtn" class="bg-slate-900/70 hover:bg-slate-900 text-yellow-300 text-xs font-semibold px-3 py-2 rounded-lg border border-yellow-500/40 transition flex items-center gap-1.5 shadow">
+                    <span class="" aria-hidden="true">⚡</span> 載入範例戰績
+                </button>
+                <button onclick="openResetModal()" class="bg-red-950/80 hover:bg-red-900 text-red-200 text-xs font-semibold px-3 py-2 rounded-lg border border-red-500/50 transition flex items-center gap-1.5 shadow">
+                    <span class="" aria-hidden="true">🗑️</span> 重置所有資料
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow">
+        
+        <!-- 左側欄：登錄對戰結果 (佔 4 欄) -->
+        <section class="lg:col-span-4">
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-5 sm:p-6 shadow-2xl sticky top-6 backdrop-blur-sm">
+                
+                <!-- 標題與快捷工具按鈕 -->
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-5">
+                    <h2 class="text-lg font-extrabold text-yellow-400 flex items-center gap-2">
+                        <span class="text-orange-500" aria-hidden="true">🎮</span> 登錄對戰結果
+                    </h2>
+                    <div class="flex items-center space-x-1.5">
+                        <button type="button" onclick="swapPlayers()" title="交換 P1 / P2 座位與角色" 
+                            class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-600 transition flex items-center gap-1">
+                            <span class="text-yellow-400" aria-hidden="true">⇄</span> 互換
+                        </button>
+                        <button type="button" onclick="clearFormInputs()" title="清空玩家名稱輸入框" 
+                            class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-lg border border-slate-600 transition flex items-center gap-1">
+                            <span class="" aria-hidden="true">🧹</span> 清空
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 內建錯誤 / 成功訊息提示框 (不使用原生 alert) -->
+                <div id="formFeedback" class="hidden mb-4 p-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all"></div>
+
+                <form id="matchForm" class="space-y-4" novalidate>
+                    <!-- PLAYER 1 區塊 -->
+                    <div class="bg-slate-950/90 p-4 rounded-xl border-l-4 border-blue-500 border-t border-r border-b border-slate-800 shadow-inner">
+                        <div class="flex justify-between items-center mb-2.5">
+                            <span class="text-blue-400 font-black text-xs tracking-wider uppercase flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-blue-500 inline-block animate-pulse"></span> PLAYER 1
+                            </span>
+                            <span class="text-[11px] text-slate-500 font-semibold">1P 控制器</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="p1Name" class="block text-xs text-slate-400 mb-1">玩家名稱</label>
+                                <input type="text" id="p1Name" list="playerList" required placeholder="輸入或點擊選擇玩家..." autocomplete="off"
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                            </div>
+                            <div>
+                                <label for="p1Char" class="block text-xs text-slate-400 mb-1">使用角色 (Character)</label>
+                                <select id="p1Char" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition cursor-pointer">
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VS 分隔標誌 -->
+                    <div class="relative flex items-center justify-center py-1">
+                        <div class="border-t border-slate-800 w-full absolute"></div>
+                        <span class="bg-slate-900 px-4 relative z-10 font-fighter text-4xl italic font-bold tracking-widest vs-text select-none">
+                            VS
+                        </span>
+                    </div>
+
+                    <!-- PLAYER 2 區塊 -->
+                    <div class="bg-slate-950/90 p-4 rounded-xl border-l-4 border-red-500 border-t border-r border-b border-slate-800 shadow-inner">
+                        <div class="flex justify-between items-center mb-2.5">
+                            <span class="text-red-400 font-black text-xs tracking-wider uppercase flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span> PLAYER 2
+                            </span>
+                            <span class="text-[11px] text-slate-500 font-semibold">2P 控制器</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="p2Name" class="block text-xs text-slate-400 mb-1">玩家名稱</label>
+                                <input type="text" id="p2Name" list="playerList" required placeholder="輸入或點擊選擇玩家..." autocomplete="off"
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition">
+                            </div>
+                            <div>
+                                <label for="p2Char" class="block text-xs text-slate-400 mb-1">使用角色 (Character)</label>
+                                <select id="p2Char" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 transition cursor-pointer">
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 歷史玩家自動完成清單 -->
+                    <datalist id="playerList"></datalist>
+
+                    <!-- 獲勝方選擇 -->
+                    <div class="pt-2">
+                        <label class="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="text-yellow-400" aria-hidden="true">👑</span> 選擇本場獲勝方 (WINNER)
+                        </label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="winner" value="p1" class="peer sr-only">
+                                <div class="text-center py-3 px-3 rounded-xl border-2 border-slate-700 bg-slate-950/80 text-slate-400 group-hover:border-slate-500 peer-checked:bg-blue-600/20 peer-checked:border-blue-500 peer-checked:text-blue-300 peer-checked:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition flex flex-col items-center justify-center">
+                                    <span class="text-xs font-extrabold tracking-wider">P1 獲勝</span>
+                                    <span id="p1WinBtnLabel" class="text-[11px] text-slate-400 truncate max-w-full mt-0.5">Player 1</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="winner" value="p2" class="peer sr-only">
+                                <div class="text-center py-3 px-3 rounded-xl border-2 border-slate-700 bg-slate-950/80 text-slate-400 group-hover:border-slate-500 peer-checked:bg-red-600/20 peer-checked:border-red-500 peer-checked:text-red-300 peer-checked:shadow-[0_0_15px_rgba(239,68,68,0.3)] transition flex flex-col items-center justify-center">
+                                    <span class="text-xs font-extrabold tracking-wider">P2 獲勝</span>
+                                    <span id="p2WinBtnLabel" class="text-[11px] text-slate-400 truncate max-w-full mt-0.5">Player 2</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 送出按鈕 -->
+                    <button type="submit" class="w-full btn-ko text-white font-black py-3.5 px-4 rounded-xl shadow-lg uppercase tracking-wider text-base flex items-center justify-center gap-2 transform active:scale-95 mt-2">
+                        <span class="" aria-hidden="true">🔥</span> 登錄戰果 (K.O.!)
+                    </button>
+                    <p class="text-[11px] text-slate-400 text-center">
+                        💡 連戰設計：送出後會保留雙方名稱與角色，方便直接紀錄下一場！
+                    </p>
+                </form>
+            </div>
+        </section>
+
+        <!-- 右側欄：排行榜與歷史紀錄 (佔 8 欄) -->
+        <section class="lg:col-span-8 space-y-8">
+            
+            <!-- 1. 玩家排行榜區 -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 pb-3 mb-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-yellow-400 flex items-center gap-2">
+                            <span class="text-yellow-500" aria-hidden="true">🏆</span> 玩家戰績排行榜
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">排序規則：優先比較總勝場數，同勝場則比較勝率高低</p>
+                    </div>
+                    <div id="playerCountBadge" class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700 font-semibold">
+                        0 位參戰玩家
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-[11px] text-slate-400 uppercase tracking-wider bg-slate-950/50">
+                                <th class="py-3 px-3 rounded-tl-lg">名次</th>
+                                <th class="py-3 px-3">玩家名稱</th>
+                                <th class="py-3 px-2 text-center">勝場</th>
+                                <th class="py-3 px-2 text-center">敗場</th>
+                                <th class="py-3 px-2 text-center">總場次</th>
+                                <th class="py-3 px-3 text-center">勝率</th>
+                                <th class="py-3 px-3 text-center">目前狀態</th>
+                                <th class="py-3 px-3 rounded-tr-lg">主力角色 (Main)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody" class="divide-y divide-slate-800/70 text-sm">
+                            <!-- 由 JavaScript 動態渲染 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. 對戰歷史紀錄區 -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 pb-3 mb-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-yellow-400 flex items-center gap-2">
+                            <span class="text-orange-400" aria-hidden="true">🕘</span> 對戰歷史紀錄
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">由新到舊排列，若登錄錯誤可點擊右側「✕」刪除並即時重算排行</p>
+                    </div>
+                    <span id="matchCountBadge" class="text-xs bg-orange-950/80 text-orange-300 border border-orange-500/40 px-3 py-1 rounded-full font-bold">
+                        共 0 場對戰
+                    </span>
+                </div>
+
+                <div id="matchHistoryList" class="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                    <!-- 由 JavaScript 動態渲染 -->
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- 二次確認 Modal (用於重置所有資料) -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex items-center space-x-3 text-red-400 mb-3">
+                <div class="w-10 h-10 rounded-full bg-red-950 border border-red-500/40 flex items-center justify-center text-lg">
+                    <span class="" aria-hidden="true">⚠️</span>
+                </div>
+                <h3 class="text-lg font-bold text-white">確定要重置所有對戰資料嗎？</h3>
+            </div>
+            <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+                這將會清空目前所有的<span class="text-yellow-400 font-semibold">玩家排行榜</span>與<span class="text-yellow-400 font-semibold">歷史對戰紀錄</span>，若為線上模式，所有朋友看到的紀錄也會一併清空，此操作無法復原。
+            </p>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition">
+                    取消
+                </button>
+                <button type="button" onclick="confirmResetAllData()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-bold shadow-lg shadow-red-600/30 transition">
+                    確定清空重置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部版權與說明 -->
+    <footer class="max-w-7xl w-full mx-auto px-4 sm:px-6 mt-12 text-center text-xs text-slate-500">
+        <p id="footerNote">Street Fighter 6 好友對戰紀錄系統</p>
+    </footer>
+
+    <script>
+        // ==========================================
+        // 1. 快打旋風 6 完整角色清單 (含 Year 1 & Year 2 DLC)
+        // ==========================================
+        const SF6_CHARACTERS = [
+            "Ryu (隆)",
+            "Ken (肯)",
+            "Chun-Li (春麗)",
+            "Luke (路克)",
+            "Jamie (傑米)",
+            "Guile (凱爾)",
+            "Juri (蛛俐)",
+            "Cammy (倩咪)",
+            "Akuma (豪鬼)",
+            "M. Bison (貝卡)",
+            "Terry (泰瑞)",
+            "Mai (不知火舞)",
+            "Elena (艾蓮娜)",
+            "Ed (艾德)",
+            "A.K.I. (阿鬼)",
+            "Rashid (拉希德)",
+            "Zangief (桑吉爾夫)",
+            "Marisa (瑪麗莎)",
+            "Manon (瑪儂)",
+            "JP (ジェイピー)",
+            "Kimberly (金伯莉)",
+            "Dee Jay (迪傑)",
+            "E. Honda (本田)",
+            "Blanka (布蘭卡)",
+            "Dhalsim (達爾西姆)",
+            "Lily (莉莉)",
+            "Random (隨機選角)"
+        ];
+
+        const STORAGE_KEY = 'sf6_friends_leaderboard_v1';
+        let matches = [];
+        let db = null;          // 線上共用資料庫 (null = 單機模式)
+        let matchesCol = null;
+        let canWrite = true;
+
+        // ==========================================
+        // 2. 初始化系統
+        // ==========================================
+        window.onload = function () {
+            initCharacterSelects();
+            setupLiveInputListeners();
+            renderAll();
+            initStorage();
+        };
+
+        // 將角色填入下拉選單
+        function initCharacterSelects() {
+            const p1Select = document.getElementById('p1Char');
+            const p2Select = document.getElementById('p2Char');
+            p1Select.innerHTML = '';
+            p2Select.innerHTML = '';
+
+            SF6_CHARACTERS.forEach(char => {
+                p1Select.add(new Option(char, char));
+                p2Select.add(new Option(char, char));
+            });
+
+            // 預設 P1 為 Ryu (隆)，P2 為 Ken (肯)
+            p1Select.selectedIndex = 0;
+            p2Select.selectedIndex = 1;
+        }
+
+        // ---- 單機模式 (localStorage) ----
+        function loadMatchesFromStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) matches = JSON.parse(saved);
+            } catch (err) {
+                console.error('讀取對戰紀錄失敗:', err);
+                matches = [];
+            }
+        }
+
+        function saveLocal() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+            } catch (err) {
+                console.error('儲存對戰紀錄失敗:', err);
+            }
+        }
+
+        // ---- 線上共用模式 (所有開同一網址的朋友看到同一份戰績) ----
+        // ==========================================
+        // Firebase 設定：請貼上你自己的專案設定 (見 README.md)
+        // 留空的話會自動使用「單機模式」(只存在這台裝置的瀏覽器)
+        // ==========================================
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBfm_rEGteaA_2SCbDLJ7LPrUMNc5s2Jtg",
+            authDomain: "streetfight6tierlist.firebaseapp.com",
+            projectId: "streetfight6tierlist",
+            appId: "1:645010242118:web:c9c47e75a7a50d99ae2847"
+        };
+        const FB_VERSION = '10.12.2';
+        let fs = null; // firestore 模組
+
+        // 房間代號：網址加上 ?room=朋友群名稱 就能一個網站開多個排行榜 (預設 main)
+        function getRoom() {
+            const r = new URLSearchParams(location.search).get('room') || 'main';
+            return r.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'main';
+        }
+
+        async function initStorage() {
+            if (!FIREBASE_CONFIG.projectId) {
+                startLocalMode();
+                return;
+            }
+            try {
+                const appMod = await import(`https://www.gstatic.com/firebasejs/${FB_VERSION}/firebase-app.js`);
+                fs = await import(`https://www.gstatic.com/firebasejs/${FB_VERSION}/firebase-firestore.js`);
+                const app = appMod.initializeApp(FIREBASE_CONFIG);
+                db = fs.getFirestore(app);
+            } catch (err) {
+                console.error('Firebase 載入失敗:', err);
+                startLocalMode();
+                return;
+            }
+
+            canWrite = true;
+            matchesCol = fs.collection(db, 'rooms', getRoom(), 'matches');
+            setSyncBadge('online');
+            fs.onSnapshot(fs.query(matchesCol, fs.orderBy('id')), snap => {
+                matches = snap.docs.map(d => Object.assign({}, d.data(), { _docId: d.id }));
+                matches.sort((x, y) => (x.id - y.id) || String(x._docId).localeCompare(String(y._docId)));
+                renderAll();
+            }, err => {
+                console.error('同步失敗，改用單機模式:', err);
+                startLocalMode();
+            });
+        }
+
+        async function fbSet(docId, m) {
+            await fs.setDoc(fs.doc(matchesCol, docId), m);
+        }
+        async function fbDelete(docId) {
+            await fs.deleteDoc(fs.doc(matchesCol, docId));
+        }
+
+        function startLocalMode() {
+            db = null;
+            matchesCol = null;
+            canWrite = true;
+            loadMatchesFromStorage();
+            setSyncBadge('local');
+            renderAll();
+        }
+
+        function setSyncBadge(mode) {
+            const badge = document.getElementById('syncBadge');
+            const note = document.getElementById('footerNote');
+            const base = 'text-xs font-bold px-3 py-2 rounded-lg border ';
+            const submitBtn = document.querySelector('#matchForm button[type="submit"]');
+            if (mode === 'online') {
+                badge.className = base + 'border-emerald-500/50 bg-emerald-950/70 text-emerald-300';
+                badge.textContent = '🟢 線上同步中';
+                note.textContent = 'Street Fighter 6 好友對戰紀錄系統 • 戰績即時同步，房間：' + getRoom();
+            } else if (mode === 'readonly') {
+                badge.className = base + 'border-yellow-500/50 bg-yellow-950/60 text-yellow-300';
+                badge.textContent = '👀 唯讀（可看不可寫）';
+                note.textContent = 'Street Fighter 6 好友對戰紀錄系統 • 唯讀模式';
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
+            } else {
+                badge.className = base + 'border-slate-600 bg-slate-900/70 text-slate-300';
+                badge.textContent = '💾 單機模式';
+                note.textContent = 'Street Fighter 6 好友對戰紀錄系統 • 單機模式：資料只存在這台裝置的瀏覽器 (localStorage)';
+            }
+        }
+
+        function newDocId(m) {
+            return String(m.id).padStart(14, '0') + '-' + Math.random().toString(36).slice(2, 6);
+        }
+
+        function handleWriteError(err) {
+            console.error(err);
+            if (err && err.code === 'permission-denied') {
+                showFeedback('沒有寫入權限，請檢查 Firestore 安全性規則。', 'error');
+            } else if (err && err.code === 'resource-exhausted') {
+                showFeedback('Firebase 免費額度已用完，請稍後再試。', 'error');
+            } else {
+                showFeedback('儲存失敗，請稍後再試。', 'error');
+            }
+        }
+
+        async function addMatch(m) {
+            if (!db) {
+                matches.push(m);
+                saveLocal();
+                renderAll();
+                return true;
+            }
+            if (!canWrite) {
+                showFeedback('你目前是唯讀身分，無法登錄戰績。', 'error');
+                return false;
+            }
+            try {
+                await fbSet(newDocId(m), m);
+                return true;
+            } catch (err) {
+                handleWriteError(err);
+                return false;
+            }
+        }
+
+        async function addMatches(list) {
+            for (const m of list) {
+                if (!(await addMatch(m))) return false;
+            }
+            return true;
+        }
+
+        function renderAll() {
+            renderLeaderboard();
+            renderHistory();
+            updatePlayerDatalist();
+        }
+
+        // 即時同步輸入框名字到下方「P1 獲勝 / P2 獲勝」按鈕標籤
+        function setupLiveInputListeners() {
+            const p1Input = document.getElementById('p1Name');
+            const p2Input = document.getElementById('p2Name');
+            const p1Label = document.getElementById('p1WinBtnLabel');
+            const p2Label = document.getElementById('p2WinBtnLabel');
+
+            const updateLabels = () => {
+                p1Label.textContent = p1Input.value.trim() || 'Player 1';
+                p2Label.textContent = p2Input.value.trim() || 'Player 2';
+            };
+
+            p1Input.addEventListener('input', updateLabels);
+            p2Input.addEventListener('input', updateLabels);
+        }
+
+        // ==========================================
+        // 3. 提示訊息控制 (取代原生 alert)
+        // ==========================================
+        let feedbackTimer = null;
+        function showFeedback(message, type = 'error') {
+            const box = document.getElementById('formFeedback');
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+
+            box.className = 'mb-4 p-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ';
+            if (type === 'error') {
+                box.className += 'bg-red-950/90 border border-red-500/60 text-red-200';
+                box.innerHTML = `<span class="text-red-400 text-sm" aria-hidden="true">❗</span> <span>${message}</span>`;
+            } else {
+                box.className += 'bg-emerald-950/90 border border-emerald-500/60 text-emerald-200';
+                box.innerHTML = `<span class="text-emerald-400 text-sm" aria-hidden="true">✅</span> <span>${message}</span>`;
+            }
+
+            box.classList.remove('hidden');
+
+            feedbackTimer = setTimeout(() => {
+                box.classList.add('hidden');
+            }, 3500);
+        }
+
+        // ==========================================
+        // 4. 排行榜統計與渲染邏輯
+        // ==========================================
+        function renderLeaderboard() {
+            const stats = {};
+
+            // 依時間順序（由舊到新）走訪每一場比賽，計算勝敗、連勝與角色使用次數
+            matches.forEach(m => {
+                [m.p1, m.p2].forEach(player => {
+                    if (!stats[player]) {
+                        stats[player] = {
+                            name: player,
+                            wins: 0,
+                            losses: 0,
+                            total: 0,
+                            streak: 0,
+                            chars: {}
+                        };
+                    }
+                });
+
+                // 場次與角色統計
+                stats[m.p1].total += 1;
+                stats[m.p2].total += 1;
+                stats[m.p1].chars[m.p1Char] = (stats[m.p1].chars[m.p1Char] || 0) + 1;
+                stats[m.p2].chars[m.p2Char] = (stats[m.p2].chars[m.p2Char] || 0) + 1;
+
+                // 勝負與目前連勝計算
+                if (m.winner === 'p1') {
+                    stats[m.p1].wins += 1;
+                    stats[m.p1].streak += 1;
+                    stats[m.p2].losses += 1;
+                    stats[m.p2].streak = 0;
+                } else {
+                    stats[m.p2].wins += 1;
+                    stats[m.p2].streak += 1;
+                    stats[m.p1].losses += 1;
+                    stats[m.p1].streak = 0;
+                }
+            });
+
+            // 轉為陣列並排序：1. 勝場數較多者優先  2. 勝率較高者優先  3. 總場次較多者優先
+            const sortedPlayers = Object.values(stats).sort((a, b) => {
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                const rateA = a.total > 0 ? a.wins / a.total : 0;
+                const rateB = b.total > 0 ? b.wins / b.total : 0;
+                if (rateB !== rateA) return rateB - rateA;
+                return b.total - a.total;
+            });
+
+            document.getElementById('playerCountBadge').textContent = `${sortedPlayers.length} 位參戰玩家`;
+            const tbody = document.getElementById('leaderboardBody');
+
+            if (sortedPlayers.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-12 text-slate-500">
+                            <span class="text-3xl mb-2 block text-slate-600" aria-hidden="true">✊</span>
+                            目前尚無對戰數據，快在左側登錄你們的第一場對決吧！
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = sortedPlayers.map((p, index) => {
+                const winRate = ((p.wins / p.total) * 100).toFixed(1);
+                
+                // 找出該玩家最常使用的主力角色 (Main)
+                const sortedChars = Object.entries(p.chars).sort((a, b) => b[1] - a[1]);
+                const mainCharFull = sortedChars[0][0];
+                const mainCharCount = sortedChars[0][1];
+
+                // 前三名獎牌與名次樣式
+                let rankDisplay = `<span class="font-mono text-slate-400 font-bold pl-2">#${index + 1}</span>`;
+                let rowBgClass = 'hover:bg-slate-800/50';
+                if (index === 0) {
+                    rankDisplay = `<span class="text-xl" title="第一名">🥇</span>`;
+                    rowBgClass = 'bg-yellow-500/5 hover:bg-yellow-500/10';
+                } else if (index === 1) {
+                    rankDisplay = `<span class="text-xl" title="第二名">🥈</span>`;
+                } else if (index === 2) {
+                    rankDisplay = `<span class="text-xl" title="第三名">🥉</span>`;
+                }
+
+                // 連勝徽章
+                let streakBadge = `<span class="text-xs text-slate-500">-</span>`;
+                if (p.streak >= 2) {
+                    streakBadge = `
+                        <span class="inline-flex items-center gap-1 bg-orange-950 text-orange-300 border border-orange-500/50 px-2 py-0.5 rounded-full text-xs font-extrabold animate-pulse">
+                            🔥 ${p.streak} 連勝
+                        </span>
+                    `;
+                } else if (p.streak === 1) {
+                    streakBadge = `
+                        <span class="inline-flex items-center gap-1 bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-xs font-semibold">
+                            1 勝
+                        </span>
+                    `;
+                }
+
+                return `
+                    <tr class="${rowBgClass} transition">
+                        <td class="py-3.5 px-3 font-bold">${rankDisplay}</td>
+                        <td class="py-3.5 px-3 font-extrabold text-white text-base">
+                            ${escapeHTML(p.name)}
+                        </td>
+                        <td class="py-3.5 px-2 text-center font-bold text-emerald-400">${p.wins}</td>
+                        <td class="py-3.5 px-2 text-center font-semibold text-red-400">${p.losses}</td>
+                        <td class="py-3.5 px-2 text-center text-slate-300">${p.total}</td>
+                        <td class="py-3.5 px-3 text-center">
+                            <span class="bg-slate-950 px-2.5 py-1 rounded-lg text-yellow-400 font-mono text-xs font-bold border border-slate-700">
+                                ${winRate}%
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-3 text-center">${streakBadge}</td>
+                        <td class="py-3.5 px-3">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-semibold text-slate-200 bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg">
+                                    ${escapeHTML(mainCharFull)}
+                                </span>
+                                <span class="text-[11px] text-slate-500 font-mono" title="使用場次">(${mainCharCount}場)</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // 5. 歷史對戰紀錄渲染邏輯
+        // ==========================================
+        function renderHistory() {
+            const container = document.getElementById('matchHistoryList');
+            document.getElementById('matchCountBadge').textContent = `共 ${matches.length} 場對戰`;
+
+            if (matches.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+                        目前還沒有任何對戰歷史紀錄
+                    </div>
+                `;
+                return;
+            }
+
+            // 由新到舊排列
+            container.innerHTML = [...matches].reverse().map((m, revIdx) => {
+                const originalIndex = matches.length - 1 - revIdx;
+                const matchNumber = originalIndex + 1;
+                const p1Win = m.winner === 'p1';
+
+                return `
+                    <div class="flex items-center justify-between bg-slate-950/80 hover:bg-slate-950 px-3.5 py-3 rounded-xl border border-slate-800/90 transition group">
+                        <div class="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                            <!-- 場次編號 -->
+                            <span class="text-[11px] font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800 shrink-0">
+                                #${matchNumber}
+                            </span>
+
+                            <!-- P1 資訊 -->
+                            <div class="flex-1 text-right truncate ${p1Win ? 'text-yellow-400 font-extrabold' : 'text-slate-400'}">
+                                <div class="flex items-center justify-end gap-1.5 truncate">
+                                    ${p1Win ? '<span title="獲勝" class="text-sm">👑</span>' : ''}
+                                    <span class="truncate text-sm sm:text-base">${escapeHTML(m.p1)}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 truncate">${escapeHTML(m.p1Char)}</div>
+                            </div>
+
+                            <!-- VS 標誌 -->
+                            <div class="shrink-0 flex flex-col items-center">
+                                <span class="text-[11px] font-black px-2 py-0.5 bg-slate-800 text-orange-400 rounded-md border border-slate-700">
+                                    VS
+                                </span>
+                            </div>
+
+                            <!-- P2 資訊 -->
+                            <div class="flex-1 text-left truncate ${!p1Win ? 'text-yellow-400 font-extrabold' : 'text-slate-400'}">
+                                <div class="flex items-center justify-start gap-1.5 truncate">
+                                    <span class="truncate text-sm sm:text-base">${escapeHTML(m.p2)}</span>
+                                    ${!p1Win ? '<span title="獲勝" class="text-sm">👑</span>' : ''}
+                                </div>
+                                <div class="text-[11px] text-slate-500 truncate">${escapeHTML(m.p2Char)}</div>
+                            </div>
+                        </div>
+
+                        <!-- 時間與刪除按鈕 -->
+                        <div class="flex items-center space-x-3 ml-3 shrink-0">
+                            <span class="text-xs text-slate-500 font-mono hidden sm:inline">${escapeHTML(m.time)}</span>
+                            <button type="button" onclick="deleteMatch(${originalIndex})" title="刪除此筆對戰紀錄" 
+                                class="w-7 h-7 rounded-lg bg-slate-900 hover:bg-red-950 text-slate-500 hover:text-red-400 border border-slate-800 hover:border-red-500/40 flex items-center justify-center transition">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 更新玩家名稱自動完成清單 (datalist)
+        function updatePlayerDatalist() {
+            const players = new Set();
+            matches.forEach(m => {
+                players.add(m.p1);
+                players.add(m.p2);
+            });
+            const datalist = document.getElementById('playerList');
+            datalist.innerHTML = Array.from(players).map(p => `<option value="${escapeHTML(p)}">`).join('');
+        }
+
+        // ==========================================
+        // 6. 表單互動功能 (送出、交換、清空、刪除)
+        // ==========================================
+        document.getElementById('matchForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const p1Input = document.getElementById('p1Name');
+            const p2Input = document.getElementById('p2Name');
+            const p1 = p1Input.value.trim();
+            const p2 = p2Input.value.trim();
+            const p1Char = document.getElementById('p1Char').value;
+            const p2Char = document.getElementById('p2Char').value;
+            const winnerRadio = document.querySelector('input[name="winner"]:checked');
+
+            // 防呆檢查 1：是否輸入雙方名稱
+            if (!p1 || !p2) {
+                showFeedback('請輸入 Player 1 與 Player 2 的玩家名稱！', 'error');
+                return;
+            }
+
+            // 防呆檢查 2：阻擋 P1 與 P2 同名（忽略大小寫空白比對）
+            if (p1.toLowerCase() === p2.toLowerCase()) {
+                showFeedback('防呆提醒：P1 與 P2 不能是同一個玩家名稱！', 'error');
+                return;
+            }
+
+            // 防呆檢查 3：是否選擇獲勝方
+            if (!winnerRadio) {
+                showFeedback('請點選本場對戰是由「P1 獲勝」還是「P2 獲勝」！', 'error');
+                return;
+            }
+
+            const winner = winnerRadio.value;
+            const now = new Date();
+            const timeStr = `${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const ok = await addMatch({
+                id: Date.now(),
+                p1,
+                p2,
+                p1Char,
+                p2Char,
+                winner,
+                time: timeStr
+            });
+            if (!ok) return;
+
+            // 連戰友善設計：保留玩家名稱與角色，僅清除勝敗勾選
+            document.querySelectorAll('input[name="winner"]').forEach(r => r.checked = false);
+
+            const winnerName = winner === 'p1' ? p1 : p2;
+            showFeedback(`K.O.! 已成功登錄「${winnerName}」獲勝！可繼續紀錄下一場。`, 'success');
+        });
+
+        // 交換 P1 與 P2 的玩家名稱與角色
+        function swapPlayers() {
+            const p1Input = document.getElementById('p1Name');
+            const p2Input = document.getElementById('p2Name');
+            const p1Select = document.getElementById('p1Char');
+            const p2Select = document.getElementById('p2Char');
+
+            const tempName = p1Input.value;
+            p1Input.value = p2Input.value;
+            p2Input.value = tempName;
+
+            const tempChar = p1Select.value;
+            p1Select.value = p2Select.value;
+            p2Select.value = tempChar;
+
+            // 同步更新下方按鈕文字
+            p1Input.dispatchEvent(new Event('input'));
+            p2Input.dispatchEvent(new Event('input'));
+
+            showFeedback('已交換 P1 與 P2 的玩家與角色！', 'success');
+        }
+
+        // 清空輸入框玩家名稱與勝敗勾選
+        function clearFormInputs() {
+            const p1Input = document.getElementById('p1Name');
+            const p2Input = document.getElementById('p2Name');
+            p1Input.value = '';
+            p2Input.value = '';
+            document.querySelectorAll('input[name="winner"]').forEach(r => r.checked = false);
+
+            p1Input.dispatchEvent(new Event('input'));
+            p2Input.dispatchEvent(new Event('input'));
+            p1Input.focus();
+        }
+
+        // 刪除單筆歷史紀錄
+        async function deleteMatch(index) {
+            if (index < 0 || index >= matches.length) return;
+            const m = matches[index];
+            if (!db) {
+                matches.splice(index, 1);
+                saveLocal();
+                renderAll();
+            } else {
+                if (!canWrite) { showFeedback('你目前是唯讀身分，無法刪除紀錄。', 'error'); return; }
+                try {
+                    await fbDelete(m._docId);
+                } catch (err) {
+                    handleWriteError(err);
+                    return;
+                }
+            }
+            showFeedback(`已刪除「${escapeHTML(m.p1)} VS ${escapeHTML(m.p2)}」的紀錄，排行榜已重新計算。`, 'success');
+        }
+
+        // ==========================================
+        // 7. 重置所有資料 Modal 與範例戰績載入
+        // ==========================================
+        function openResetModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function confirmResetAllData() {
+            closeResetModal();
+            if (!db) {
+                matches = [];
+                saveLocal();
+                renderAll();
+            } else {
+                if (!canWrite) { showFeedback('你目前是唯讀身分，無法重置資料。', 'error'); return; }
+                try {
+                    for (const m of [...matches]) {
+                        await fbDelete(m._docId);
+                    }
+                } catch (err) {
+                    handleWriteError(err);
+                    return;
+                }
+            }
+            showFeedback('所有排行榜與對戰歷史紀錄已重置清空！', 'success');
+        }
+
+        // 載入範例資料方便預覽效果
+        async function loadDemoData() {
+            const sampleMatches = [
+                { id: 1, p1: '阿凱', p2: '小杰', p1Char: 'Ken (肯)', p2Char: 'Luke (路克)', winner: 'p1', time: '10/14 20:15' },
+                { id: 2, p1: '阿凱', p2: '小杰', p1Char: 'Ken (肯)', p2Char: 'Luke (路克)', winner: 'p2', time: '10/14 20:19' },
+                { id: 3, p1: '阿凱', p2: '小杰', p1Char: 'Akuma (豪鬼)', p2Char: 'Luke (路克)', winner: 'p1', time: '10/14 20:24' },
+                { id: 4, p1: '大衛', p2: '阿凱', p1Char: 'Zangief (桑吉爾夫)', p2Char: 'Ken (肯)', winner: 'p1', time: '10/14 20:30' },
+                { id: 5, p1: '大衛', p2: '小杰', p1Char: 'Zangief (桑吉爾夫)', p2Char: 'Juri (蛛俐)', winner: 'p2', time: '10/14 20:35' },
+                { id: 6, p1: '阿琳', p2: '小杰', p1Char: 'Mai (不知火舞)', p2Char: 'Juri (蛛俐)', winner: 'p1', time: '10/14 20:42' },
+                { id: 7, p1: '阿琳', p2: '大衛', p1Char: 'Mai (不知火舞)', p2Char: 'M. Bison (貝卡)', winner: 'p1', time: '10/14 20:48' },
+                { id: 8, p1: '阿琳', p2: '阿凱', p1Char: 'Cammy (倩咪)', p2Char: 'Ken (肯)', winner: 'p1', time: '10/14 20:55' }
+            ];
+            if (matches.length > 0) {
+                showFeedback('排行榜已有資料，請先重置後再載入範例戰績。', 'error');
+                return;
+            }
+            if (!(await addMatches(sampleMatches))) return;
+
+            // 預填最後一場的玩家方便直接體驗連戰
+            document.getElementById('p1Name').value = '阿琳';
+            document.getElementById('p2Name').value = '阿凱';
+            document.getElementById('p1Char').value = 'Mai (不知火舞)';
+            document.getElementById('p2Char').value = 'Ken (肯)';
+            document.getElementById('p1Name').dispatchEvent(new Event('input'));
+            document.getElementById('p2Name').dispatchEvent(new Event('input'));
+
+            showFeedback('已載入範例戰績！可以直接測試排行榜或繼續新增對戰。', 'success');
+        }
+
+        // 防止 XSS 輔助函式
+        function escapeHTML(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
